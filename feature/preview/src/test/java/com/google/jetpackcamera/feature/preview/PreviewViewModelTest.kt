@@ -67,6 +67,7 @@ class PreviewViewModelTest {
         assertEquals(cameraUseCase.numPicturesTaken, 1)
     }
 
+
     @Test
     fun flipCamera() {
         // TODO(yasith)
