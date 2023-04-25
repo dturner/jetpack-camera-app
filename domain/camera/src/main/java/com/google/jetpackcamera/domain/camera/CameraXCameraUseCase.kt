@@ -23,19 +23,28 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraSelector.LensFacing
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.concurrent.futures.await
 import androidx.lifecycle.LifecycleOwner
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private const val TAG = "CameraXCameraRepository"
+private const val TAG = "CameraXCameraUseCase"
 
 /**
  * CameraX based implementation for [CameraUseCase]
  */
 class CameraXCameraUseCase @Inject constructor(
-    private val application: Application
+    private val application: Application,
+    private val defaultDispatcher: CoroutineDispatcher
 ) : CameraUseCase {
     private lateinit var cameraProvider: ProcessCameraProvider
     private lateinit var camera: Camera
@@ -73,13 +82,35 @@ class CameraXCameraUseCase @Inject constructor(
 
         previewUseCase.setSurfaceProvider(surfaceProvider)
 
-        cameraProvider.unbindAll()
-        camera = cameraProvider.bindToLifecycle(
-            lifecycleOwner,
-            cameraSelector,
-            previewUseCase,
-            imageCaptureUseCase
-        )
+        try {
+            cameraProvider.unbindAll()
+            camera = cameraProvider.bindToLifecycle(
+                lifecycleOwner,
+                cameraSelector,
+                previewUseCase,
+                imageCaptureUseCase
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "UseCase binding failed", e)
+        }
+    }
+
+    override suspend fun takePicture() {
+        val imageDeferred = CompletableDeferred<ImageProxy>()
+
+        imageCaptureUseCase.takePicture(
+            defaultDispatcher.asExecutor(),
+            object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(imageProxy: ImageProxy) {
+                    Log.d(TAG, "onCaptureSuccess")
+                    imageDeferred.complete(imageProxy)
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    super.onError(exception)
+                    Log.d(TAG, "takePicture onError: $exception")
+                }
+            })
     }
 
     private fun cameraLensToSelector(@LensFacing lensFacing: Int): CameraSelector =

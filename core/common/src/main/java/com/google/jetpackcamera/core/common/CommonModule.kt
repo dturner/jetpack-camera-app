@@ -14,32 +14,22 @@
  * limitations under the License.
  */
 
-package com.google.jetpackcamera.domain.camera
+package com.google.jetpackcamera.core.common
 
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview
-import androidx.lifecycle.LifecycleOwner
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineDispatcher
+
 
 /**
- * Data layer for camera.
+ * Dagger [Module] for Common dependencies.
  */
-interface CameraUseCase {
+@Module
+@InstallIn(SingletonComponent::class)
+class CommonModule {
 
-    /**
-     * Initializes the camera.
-     *
-     * @return list of available lenses.
-     */
-    suspend fun initialize(): List<Int>
-
-    /**
-     * Starts the camera preview.
-     */
-    fun startPreview(
-        lifecycleOwner: LifecycleOwner,
-        surfaceProvider: Preview.SurfaceProvider,
-        @CameraSelector.LensFacing lensFacing: Int
-    )
-
-    suspend fun takePicture()
+    @Provides
+    fun provideDefaultDispatcher() : CoroutineDispatcher = kotlinx.coroutines.Dispatchers.Default
 }

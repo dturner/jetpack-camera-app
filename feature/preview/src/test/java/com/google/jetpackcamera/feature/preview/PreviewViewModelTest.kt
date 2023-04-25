@@ -17,32 +17,29 @@
 package com.google.jetpackcamera.feature.preview
 
 
-import androidx.camera.core.Preview.SurfaceProvider
-import androidx.lifecycle.LifecycleOwner
-import com.google.jetpackcamera.domain.camera.CameraUseCase
+import com.google.jetpackcamera.domain.camera.test.FakeCameraUseCase
 import junit.framework.TestCase.assertEquals
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Before
 import org.junit.Test
-import org.mockito.Mock
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.verify
-import org.mockito.MockitoAnnotations
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class PreviewViewModelTest {
 
-    @Mock private lateinit var mockCameraUseCase : CameraUseCase
+    private val cameraUseCase = FakeCameraUseCase()
     private lateinit var previewViewModel : PreviewViewModel
 
     @Before
-    fun setup() {
-        MockitoAnnotations.initMocks(this)
+    fun setup() = runTest(StandardTestDispatcher()) {
         Dispatchers.setMain(StandardTestDispatcher())
-        previewViewModel = PreviewViewModel(mockCameraUseCase)
+        previewViewModel = PreviewViewModel(cameraUseCase)
+        advanceUntilIdle()
     }
 
 
@@ -57,17 +54,17 @@ class PreviewViewModelTest {
 
     @Test
     fun startPreview() {
-        val lifecycleOwner : LifecycleOwner = mock()
-        val surfaceProvider : SurfaceProvider = mock()
-        previewViewModel.startPreview(lifecycleOwner, surfaceProvider)
+        previewViewModel.startPreview(mock(), mock())
 
-        val previewUiState = previewViewModel.previewUiState.value
+        assertEquals(cameraUseCase.previewStarted, true)
+    }
 
-        verify(mockCameraUseCase).startPreview(
-            lifecycleOwner,
-            surfaceProvider,
-            previewUiState.lensFacing
-        )
+    @Test
+    fun captureImage() = runTest(StandardTestDispatcher()){
+        previewViewModel.startPreview(mock(), mock())
+        previewViewModel.captureImage()
+        advanceUntilIdle()
+        assertEquals(cameraUseCase.numPicturesTaken, 1)
     }
 
     @Test
