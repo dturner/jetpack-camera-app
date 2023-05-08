@@ -22,11 +22,14 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.camera.core.Preview.SurfaceProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.jetpackcamera.domain.camera.CameraUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.lang.IllegalStateException
 import javax.inject.Inject
 
 private const val TAG = "PreviewViewModel"
@@ -42,6 +45,8 @@ class PreviewViewModel @Inject constructor(
     private val _previewUiState: MutableStateFlow<PreviewUiState> =
         MutableStateFlow(PreviewUiState())
     val previewUiState: StateFlow<PreviewUiState> = _previewUiState
+
+    private var recordingJob : Job? = null
 
     init {
         initializeCamera()
@@ -86,5 +91,37 @@ class PreviewViewModel @Inject constructor(
                 Log.d(TAG, exception.toString())
             }
         }
+    }
+
+    fun startVideoRecording() {
+        Log.d(TAG, "startVideoRecording")
+        recordingJob = viewModelScope.launch {
+
+            try {
+                cameraUseCase.startVideoRecording()
+                _previewUiState.emit(
+                    previewUiState.value.copy(
+                        videoRecordingState = VideoRecordingState.ACTIVE
+                    )
+                )
+                Log.d(TAG, "cameraUseCase.startRecording success")
+            } catch (exception: IllegalStateException) {
+                Log.d(TAG, "cameraUseCase.startVideoRecording error")
+                Log.d(TAG, exception.toString())
+            }
+        }
+    }
+
+    fun stopVideoRecording() {
+        Log.d(TAG, "stopVideoRecording")
+        viewModelScope.launch {
+            _previewUiState.emit(
+                previewUiState.value.copy(
+                    videoRecordingState = VideoRecordingState.INACTIVE
+                )
+            )
+        }
+        cameraUseCase.stopVideoRecording()
+        recordingJob?.cancel()
     }
 }

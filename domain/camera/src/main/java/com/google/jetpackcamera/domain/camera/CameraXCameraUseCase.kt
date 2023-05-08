@@ -17,6 +17,8 @@
 package com.google.jetpackcamera.domain.camera
 
 import android.app.Application
+import android.content.ContentValues
+import android.provider.MediaStore
 import android.util.Log
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
@@ -27,14 +29,18 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.MediaStoreOutputOptions
+import androidx.camera.video.Recorder
+import androidx.camera.video.Recording
+import androidx.camera.video.VideoCapture
 import androidx.concurrent.futures.await
+import androidx.core.content.ContextCompat
+import androidx.core.util.Consumer
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
-import kotlinx.coroutines.launch
+import java.util.Date
 import javax.inject.Inject
 
 private const val TAG = "CameraXCameraUseCase"
@@ -56,6 +62,11 @@ class CameraXCameraUseCase @Inject constructor(
     private val previewUseCase = Preview.Builder()
         .setTargetAspectRatio(AspectRatio.RATIO_16_9)
         .build()
+
+    private val recorder = Recorder.Builder().setExecutor(defaultDispatcher.asExecutor()).build()
+    private val videoCaptureUseCase = VideoCapture.withOutput(recorder)
+
+    private var recording : Recording? = null
 
     override suspend fun initialize(): List<Int> {
         cameraProvider = ProcessCameraProvider.getInstance(application).await()
@@ -79,7 +90,6 @@ class CameraXCameraUseCase @Inject constructor(
         Log.d(TAG, "startPreview")
 
         val cameraSelector = cameraLensToSelector(lensFacing)
-
         previewUseCase.setSurfaceProvider(surfaceProvider)
 
         try {
@@ -88,7 +98,8 @@ class CameraXCameraUseCase @Inject constructor(
                 lifecycleOwner,
                 cameraSelector,
                 previewUseCase,
-                imageCaptureUseCase
+                imageCaptureUseCase,
+                videoCaptureUseCase
             )
         } catch (e: Exception) {
             Log.e(TAG, "UseCase binding failed", e)
@@ -111,6 +122,31 @@ class CameraXCameraUseCase @Inject constructor(
                     Log.d(TAG, "takePicture onError: $exception")
                 }
             })
+    }
+
+    override suspend fun startVideoRecording() {
+        Log.d(TAG, "recordVideo")
+        val name = "JCA-recording-${Date()}.mp4"
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Video.Media.DISPLAY_NAME, name)
+        }
+        val mediaStoreOutput = MediaStoreOutputOptions.Builder(application.contentResolver,
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+                .setContentValues(contentValues)
+                .build()
+
+        recording = videoCaptureUseCase.output
+                .prepareRecording(application, mediaStoreOutput)
+                .start(ContextCompat.getMainExecutor(application), Consumer { videoRecordEvent ->
+                    run {
+                        Log.d(TAG, videoRecordEvent.toString())
+                    }
+                })
+    }
+
+    override fun stopVideoRecording() {
+        Log.d(TAG, "stopRecording")
+        recording?.stop()
     }
 
     private fun cameraLensToSelector(@LensFacing lensFacing: Int): CameraSelector =
