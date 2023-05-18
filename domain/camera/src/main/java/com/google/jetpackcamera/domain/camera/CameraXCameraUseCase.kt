@@ -23,6 +23,7 @@ import android.util.Log
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.CameraSelector.LENS_FACING_BACK
 import androidx.camera.core.CameraSelector.LensFacing
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -36,6 +37,9 @@ import androidx.camera.video.VideoCapture
 import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
 import androidx.core.util.Consumer
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -68,6 +72,9 @@ class CameraXCameraUseCase @Inject constructor(
 
     private var recording : Recording? = null
 
+    private var lifecycleOwner: LifecycleOwner? = null
+    @LensFacing private var  currentLens : Int = LENS_FACING_BACK
+
     override suspend fun initialize(): List<Int> {
         cameraProvider = ProcessCameraProvider.getInstance(application).await()
 
@@ -83,27 +90,56 @@ class CameraXCameraUseCase @Inject constructor(
     }
 
     override fun startPreview(
-        lifecycleOwner: LifecycleOwner,
+        _lifecycleOwner: LifecycleOwner,
         surfaceProvider: Preview.SurfaceProvider,
         @LensFacing lensFacing: Int,
     ) {
         Log.d(TAG, "startPreview")
 
-        val cameraSelector = cameraLensToSelector(lensFacing)
+        currentLens = lensFacing
+        lifecycleOwner = _lifecycleOwner
         previewUseCase.setSurfaceProvider(surfaceProvider)
 
-        try {
-            cameraProvider.unbindAll()
-            camera = cameraProvider.bindToLifecycle(
-                lifecycleOwner,
-                cameraSelector,
-                previewUseCase,
-                imageCaptureUseCase,
-                videoCaptureUseCase
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "UseCase binding failed", e)
+        lifecycleOwner?.lifecycle?.addObserver(object : LifecycleEventObserver {
+            override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
+                Log.d(TAG, event.toString())
+                if (event.targetState == Lifecycle.State.DESTROYED) {
+                    lifecycleOwner = null
+                    Log.d(TAG, event.toString())
+                }
+            }
+        })
+
+        rebindUseCases()
+    }
+
+    private fun rebindUseCases() {
+        val cameraSelector = cameraLensToSelector(currentLens)
+
+        lifecycleOwner?.let {
+            try {
+                cameraProvider.unbindAll()
+                camera = cameraProvider.bindToLifecycle(
+                    it,
+                    cameraSelector,
+                    previewUseCase,
+                    imageCaptureUseCase,
+                    videoCaptureUseCase
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "UseCase binding failed", e)
+            }
         }
+    }
+
+    override fun flipCamera() {
+        currentLens = when(currentLens) {
+            CameraSelector.LENS_FACING_FRONT -> CameraSelector.LENS_FACING_BACK
+            CameraSelector.LENS_FACING_BACK -> CameraSelector.LENS_FACING_FRONT
+            else -> throw IllegalArgumentException("Invalid lens facing type: $currentLens")
+        }
+
+        rebindUseCases()
     }
 
     override suspend fun takePicture() {

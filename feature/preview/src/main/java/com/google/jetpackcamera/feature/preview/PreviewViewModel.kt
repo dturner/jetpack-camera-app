@@ -77,7 +77,8 @@ class PreviewViewModel @Inject constructor(
     }
 
     fun flipCamera() {
-        // TODO(yasith)
+        Log.d(TAG, "flipCamera")
+        cameraUseCase.flipCamera()
     }
 
     fun captureImage() {

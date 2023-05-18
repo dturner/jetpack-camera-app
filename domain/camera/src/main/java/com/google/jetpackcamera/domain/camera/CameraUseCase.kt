@@ -46,4 +46,6 @@ interface CameraUseCase {
     suspend fun startVideoRecording()
 
     fun stopVideoRecording()
+
+    fun flipCamera()
 }
