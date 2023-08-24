@@ -140,6 +140,12 @@ class PreviewViewModel @Inject constructor(
         )
     }
 
+    fun toggleCaptureMode() {
+        viewModelScope.launch {
+            cameraUseCase.toggleCaptureMode()
+        }
+    }
+
     // sets the camera to a designated direction
     fun flipCamera(isFacingFront: Boolean) {
         // only flip if 2 directions are available

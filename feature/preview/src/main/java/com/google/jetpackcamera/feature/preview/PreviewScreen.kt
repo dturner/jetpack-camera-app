@@ -122,9 +122,8 @@ fun PreviewScreen(
                 .pointerInput(Unit) {
                 detectTapGestures(
                     onDoubleTap = { offset ->
-                        // double tap to flip camera
                         Log.d(TAG, "onDoubleTap $offset")
-                        viewModel.flipCamera()
+                        viewModel.toggleCaptureMode()
                     },
                     onTap = { offset ->
                         // tap to focus
