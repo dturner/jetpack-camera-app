@@ -17,10 +17,13 @@
 package com.google.jetpackcamera.domain.camera
 
 import android.view.Display
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import com.google.jetpackcamera.settings.model.AspectRatio
 import com.google.jetpackcamera.settings.model.CameraAppSettings
 import com.google.jetpackcamera.settings.model.FlashModeStatus
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 
 /**
  * Data layer for camera.
@@ -32,7 +35,7 @@ interface CameraUseCase {
      *
      * @return list of available lenses.
      */
-    suspend fun initialize(currentCameraSettings: CameraAppSettings): List<Int>
+    suspend fun initialize(): List<Int>
 
     /**
      * Starts the camera with [lensFacing] with the provided [Preview.SurfaceProvider].
@@ -46,9 +49,7 @@ interface CameraUseCase {
 
     suspend fun takePicture()
 
-    suspend fun startVideoRecording()
-
-    fun stopVideoRecording()
+    fun startVideoRecording(scope: CoroutineScope): Job
 
     fun setZoomScale(scale: Float): Float
 

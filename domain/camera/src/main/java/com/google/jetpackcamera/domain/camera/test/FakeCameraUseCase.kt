@@ -40,7 +40,7 @@ class FakeCameraUseCase : CameraUseCase {
     private var flashMode = FlashModeStatus.OFF
     private var aspectRatio = AspectRatio.THREE_FOUR
 
-    override suspend fun initialize(currentCameraSettings: CameraAppSettings): List<Int> {
+    override suspend fun initialize(): List<Int> {
         initialized = true
         flashMode = currentCameraSettings.flash_mode_status
         isLensFacingFront = currentCameraSettings.default_front_camera
@@ -76,10 +76,6 @@ class FakeCameraUseCase : CameraUseCase {
 
     override suspend fun startVideoRecording() {
         recordingInProgress = true
-    }
-
-    override fun stopVideoRecording() {
-        recordingInProgress = false
     }
 
     override fun setZoomScale(scale: Float): Float {

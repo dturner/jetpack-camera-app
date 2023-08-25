@@ -22,6 +22,7 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview.SurfaceProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.jetpackcamera.domain.camera.CameraController
 import com.google.jetpackcamera.domain.camera.CameraUseCase
 import com.google.jetpackcamera.settings.SettingsRepository
 import com.google.jetpackcamera.settings.model.DEFAULT_CAMERA_APP_SETTINGS
@@ -43,8 +44,11 @@ private const val TAG = "PreviewViewModel"
 @HiltViewModel
 class PreviewViewModel @Inject constructor(
     private val cameraUseCase: CameraUseCase,
+    private val cameraControllerFactory: CameraControllerFactory,
     private val settingsRepository: SettingsRepository // only reads from settingsRepository. do not push changes to repository from here
 ) : ViewModel() {
+
+    private var cameraController: CameraController? = null
 
     private val _previewUiState: MutableStateFlow<PreviewUiState> =
         MutableStateFlow(PreviewUiState(currentCameraSettings = DEFAULT_CAMERA_APP_SETTINGS))
@@ -71,7 +75,7 @@ class PreviewViewModel @Inject constructor(
         // TODO(yasith): Handle CameraUnavailableException
         Log.d(TAG, "initializeCamera")
         viewModelScope.launch {
-            cameraUseCase.initialize(previewUiState.value.currentCameraSettings)
+            cameraController = cameraControllerFactory.create()
             _previewUiState.emit(
                 previewUiState.value.copy(
                     cameraState = CameraState.READY
@@ -83,22 +87,12 @@ class PreviewViewModel @Inject constructor(
     fun runCamera(surfaceProvider: SurfaceProvider) {
         Log.d(TAG, "runCamera")
         stopCamera()
-        runningCameraJob = viewModelScope.launch {
-            // TODO(yasith): Handle Exceptions from binding use cases
-            cameraUseCase.runCamera(
-                surfaceProvider,
-                previewUiState.value.currentCameraSettings
-            )
-        }
+        runningCameraJob = cameraController?.run(viewModelScope, surfaceProvider)
     }
 
     fun stopCamera() {
         Log.d(TAG, "stopCamera")
-        runningCameraJob?.apply {
-            if (isActive) {
-                cancel()
-            }
-        }
+        runningCameraJob?.cancel()
     }
 
     fun setFlash(flashModeStatus: FlashModeStatus) {
@@ -184,21 +178,7 @@ class PreviewViewModel @Inject constructor(
 
     fun startVideoRecording() {
         Log.d(TAG, "startVideoRecording")
-        recordingJob = viewModelScope.launch {
-
-            try {
-                cameraUseCase.startVideoRecording()
-                _previewUiState.emit(
-                    previewUiState.value.copy(
-                        videoRecordingState = VideoRecordingState.ACTIVE
-                    )
-                )
-                Log.d(TAG, "cameraUseCase.startRecording success")
-            } catch (exception: IllegalStateException) {
-                Log.d(TAG, "cameraUseCase.startVideoRecording error")
-                Log.d(TAG, exception.toString())
-            }
-        }
+        recordingJob = cameraUseCase.startVideoRecording(viewModelScope)
     }
 
     fun stopVideoRecording() {
@@ -210,7 +190,6 @@ class PreviewViewModel @Inject constructor(
                 )
             )
         }
-        cameraUseCase.stopVideoRecording()
         recordingJob?.cancel()
     }
 
