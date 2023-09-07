@@ -17,6 +17,9 @@
 package com.google.jetpackcamera.feature.preview
 
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.impl.CameraConfig
+import com.google.jetpackcamera.domain.camera.CameraUseCase
+import com.google.jetpackcamera.domain.camera.CameraUseCase.LensFacing
 import com.google.jetpackcamera.settings.model.CameraAppSettings
 
 
@@ -26,11 +29,16 @@ import com.google.jetpackcamera.settings.model.CameraAppSettings
 data class PreviewUiState(
     val cameraState: CameraState = CameraState.NOT_READY,
     val currentCameraSettings: CameraAppSettings, // "quick" settings
-    val lensFacing: Int = CameraSelector.LENS_FACING_BACK,
+    val lensFacing: LensFacing = LensFacing.LENS_FACING_FRONT,
     val videoRecordingState: VideoRecordingState = VideoRecordingState.INACTIVE,
     val quickSettingsIsOpen: Boolean = false,
-    val singleStreamCapture: Boolean = false,
+    val captureMode: CaptureMode = CaptureMode.CAPTURE_MODE_SINGLE_STREAM,
 )
+
+enum class CaptureMode {
+    CAPTURE_MODE_SINGLE_STREAM,
+    CAPTURE_MODE_MULTI_STREAM
+}
 
 /**
  * Defines the current state of Video Recording

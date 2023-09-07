@@ -24,91 +24,91 @@ import com.google.jetpackcamera.settings.model.AspectRatio
 import com.google.jetpackcamera.settings.model.CameraAppSettings
 import com.google.jetpackcamera.settings.model.FlashModeStatus
 
-class FakeCameraUseCase : CameraUseCase {
-
-    private val availableLenses =
-        listOf(CameraSelector.LENS_FACING_FRONT, CameraSelector.LENS_FACING_BACK)
-    private var initialized = false
-    private var useCasesBinded = false
-
-    var previewStarted = false
-    var numPicturesTaken = 0
-
-    var recordingInProgress = false
-
-    var isLensFacingFront = false
-    private var flashMode = FlashModeStatus.OFF
-    private var aspectRatio = AspectRatio.THREE_FOUR
-
-    override suspend fun initialize(currentCameraSettings: CameraAppSettings): List<Int> {
-        initialized = true
-        flashMode = currentCameraSettings.flash_mode_status
-        isLensFacingFront = currentCameraSettings.default_front_camera
-        aspectRatio = currentCameraSettings.aspect_ratio
-        return availableLenses
-    }
-
-    override suspend fun runCamera(
-        surfaceProvider: Preview.SurfaceProvider,
-        currentCameraSettings: CameraAppSettings,
-    ) {
-        val lensFacing = when (currentCameraSettings.default_front_camera) {
-            true -> CameraSelector.LENS_FACING_FRONT
-            false -> CameraSelector.LENS_FACING_BACK
-        }
-
-        if (!initialized) {
-            throw IllegalStateException("CameraProvider not initialized")
-        }
-        if (!availableLenses.contains(lensFacing)) {
-            throw IllegalStateException("Requested lens not available")
-        }
-        useCasesBinded = true
-        previewStarted = true
-    }
-
-    override suspend fun takePicture() {
-        if (!useCasesBinded) {
-            throw IllegalStateException("Usecases not binded")
-        }
-        numPicturesTaken += 1
-    }
-
-    override suspend fun startVideoRecording() {
-        recordingInProgress = true
-    }
-
-    override fun stopVideoRecording() {
-        recordingInProgress = false
-    }
-
-    override fun setZoomScale(scale: Float): Float {
-        return -1f
-    }
-
-    override fun setFlashMode(flashModeStatus: FlashModeStatus) {
-        flashMode = flashModeStatus
-    }
-
-    override suspend fun setAspectRatio(aspectRatio: AspectRatio, isFrontFacing: Boolean) {
-        this.aspectRatio = aspectRatio
-    }
-
-    override suspend fun flipCamera(isFrontFacing: Boolean) {
-        isLensFacingFront = isFrontFacing
-    }
-
-    override fun tapToFocus(
-        display: Display,
-        surfaceWidth: Int,
-        surfaceHeight: Int,
-        x: Float,
-        y: Float
-    ) {
-        TODO("Not yet implemented")
-    }
-
-    override suspend fun setSingleStreamCapture(singleStreamCapture: Boolean) {
-        TODO("Not yet implemented")
-    }
-}
+//class FakeCameraUseCase : CameraUseCase {
+//
+//    private val availableLenses =
+//        listOf(CameraSelector.LENS_FACING_FRONT, CameraSelector.LENS_FACING_BACK)
+//    private var initialized = false
+//    private var useCasesBinded = false
+//
+//    var previewStarted = false
+//    var numPicturesTaken = 0
+//
+//    var recordingInProgress = false
+//
+//    var isLensFacingFront = false
+//    private var flashMode = FlashModeStatus.OFF
+//    private var aspectRatio = AspectRatio.THREE_FOUR
+//
+//    override suspend fun initialize(currentCameraSettings: CameraAppSettings): List<Int> {
+//        initialized = true
+//        flashMode = currentCameraSettings.flash_mode_status
+//        isLensFacingFront = currentCameraSettings.default_front_camera
+//        aspectRatio = currentCameraSettings.aspect_ratio
+//        return availableLenses
+//    }
+//
+//    override suspend fun runCamera(
+//        surfaceProvider: Preview.SurfaceProvider,
+//        currentCameraSettings: CameraAppSettings,
+//    ) {
+//        val lensFacing = when (currentCameraSettings.default_front_camera) {
+//            true -> CameraSelector.LENS_FACING_FRONT
+//            false -> CameraSelector.LENS_FACING_BACK
+//        }
+//
+//        if (!initialized) {
+//            throw IllegalStateException("CameraProvider not initialized")
+//        }
+//        if (!availableLenses.contains(lensFacing)) {
+//            throw IllegalStateException("Requested lens not available")
+//        }
+//        useCasesBinded = true
+//        previewStarted = true
+//    }
+//
+//    override suspend fun takePicture() {
+//        if (!useCasesBinded) {
+//            throw IllegalStateException("Usecases not binded")
+//        }
+//        numPicturesTaken += 1
+//    }
+//
+//    override suspend fun startVideoRecording() {
+//        recordingInProgress = true
+//    }
+//
+//    override fun stopVideoRecording() {
+//        recordingInProgress = false
+//    }
+//
+//    override fun setZoomScale(scale: Float): Float {
+//        return -1f
+//    }
+//
+//    override fun setFlashMode(flashModeStatus: FlashModeStatus) {
+//        flashMode = flashModeStatus
+//    }
+//
+//    override suspend fun setAspectRatio(aspectRatio: AspectRatio, isFrontFacing: Boolean) {
+//        this.aspectRatio = aspectRatio
+//    }
+//
+//    override suspend fun flipCamera(isFrontFacing: Boolean) {
+//        isLensFacingFront = isFrontFacing
+//    }
+//
+//    override fun tapToFocus(
+//        display: Display,
+//        surfaceWidth: Int,
+//        surfaceHeight: Int,
+//        x: Float,
+//        y: Float
+//    ) {
+//        TODO("Not yet implemented")
+//    }
+//
+//    override suspend fun setSingleStreamCapture(singleStreamCapture: Boolean) {
+//        TODO("Not yet implemented")
+//    }
+//}

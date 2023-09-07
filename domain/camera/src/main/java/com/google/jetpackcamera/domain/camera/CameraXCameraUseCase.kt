@@ -20,11 +20,11 @@ import android.app.Application
 import android.content.ContentValues
 import android.provider.MediaStore
 import android.util.Log
-import android.util.Rational
 import android.view.Display
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.CameraSelector.LensFacing
+import androidx.camera.core.CameraSelector.DEFAULT_BACK_CAMERA
+import androidx.camera.core.CameraSelector.DEFAULT_FRONT_CAMERA
 import androidx.camera.core.DisplayOrientedMeteringPointFactory
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
@@ -44,7 +44,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.util.Consumer
 import com.google.jetpackcamera.domain.camera.CameraUseCase.Companion.INVALID_ZOOM_SCALE
 import com.google.jetpackcamera.settings.SettingsRepository
-import com.google.jetpackcamera.settings.model.AspectRatio
 import com.google.jetpackcamera.settings.model.CameraAppSettings
 import com.google.jetpackcamera.settings.model.FlashModeStatus
 import kotlinx.coroutines.CompletableDeferred
@@ -52,11 +51,11 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.Date
 import javax.inject.Inject
 
 private const val TAG = "CameraXCameraUseCase"
-private val ASPECT_RATIO_16_9 = Rational(16, 9)
 
 /**
  * CameraX based implementation for [CameraUseCase]
@@ -80,33 +79,31 @@ class CameraXCameraUseCase @Inject constructor(
 
     private lateinit var useCaseGroup: UseCaseGroup
 
-    private lateinit var aspectRatio : AspectRatio
-    private var singleStreamCaptureEnabled = false
-    private var isFrontFacing = true
+    private val _config: MutableStateFlow<CameraUseCase.Config> =
+        MutableStateFlow(
+            CameraUseCase.Config(
+                CameraUseCase.LensFacing.LENS_FACING_FRONT,
+                CameraUseCase.CaptureMode.CAPTURE_MODE_MULTI_STREAM,
+                CameraUseCase.AspectRatio.ASPECT_RATIO_4_3,
+                CameraUseCase.FlashMode.FLASH_MODE_OFF,
+            ),
+        )
 
-    override suspend fun initialize(currentCameraSettings: CameraAppSettings): List<Int> {
-        this.aspectRatio = currentCameraSettings.aspect_ratio
-        setFlashMode(currentCameraSettings.flash_mode_status)
+    override val config = _config
+
+    override suspend fun initialize(initialConfig: CameraUseCase.Config) {
+        _config.emit(initialConfig)
         updateUseCaseGroup()
-        cameraProvider = ProcessCameraProvider.getInstance(application).await()
 
-        val availableCameraLens =
-            listOf(
-                CameraSelector.LENS_FACING_BACK,
-                CameraSelector.LENS_FACING_FRONT
-            ).filter { lensFacing ->
-                cameraProvider.hasCamera(cameraLensToSelector(lensFacing))
-            }
+        cameraProvider = ProcessCameraProvider.getInstance(application).await()
 
         //updates values for available camera lens if necessary
         coroutineScope {
             settingsRepository.updateAvailableCameraLens(
-                availableCameraLens.contains(CameraSelector.LENS_FACING_FRONT),
-                availableCameraLens.contains(CameraSelector.LENS_FACING_BACK)
+                cameraProvider.hasCamera(DEFAULT_FRONT_CAMERA),
+                cameraProvider.hasCamera(DEFAULT_BACK_CAMERA)
             )
         }
-
-        return availableCameraLens
     }
 
     override suspend fun runCamera(
@@ -115,12 +112,9 @@ class CameraXCameraUseCase @Inject constructor(
     ) = coroutineScope {
         Log.d(TAG, "startPreview")
 
-        val cameraSelector =
-            cameraLensToSelector(getLensFacing(currentCameraSettings.default_front_camera))
-
         previewUseCase.setSurfaceProvider(surfaceProvider)
 
-        cameraProvider.runWith(cameraSelector, useCaseGroup) {
+        cameraProvider.runWith(config.value.lensFacing.toCameraSelector(), useCaseGroup) {
             camera = it
             awaitCancellation()
         }
@@ -145,9 +139,8 @@ class CameraXCameraUseCase @Inject constructor(
     }
 
     override suspend fun startVideoRecording() {
-        Log.d(TAG, "recordVideo")
-        val captureTypeString = if(singleStreamCaptureEnabled) "SingleStream" else "MultiStream"
-        val name = "JCA-recording-${Date()}-$captureTypeString.mp4"
+        Log.d(TAG, "startVideoRecording")
+        val name = "JCA-recording-${Date()}-${config.value.captureMode}.mp4"
         val contentValues = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, name)
         }
@@ -182,12 +175,10 @@ class CameraXCameraUseCase @Inject constructor(
 
     private fun getZoomState(): ZoomState? = camera?.cameraInfo?.zoomState?.value
 
-    // flips the camera to the designated lensFacing direction
-    override suspend fun flipCamera(isFrontFacing: Boolean) {
-        this.isFrontFacing = isFrontFacing
-        rebindUseCases(
-
-        )
+    override suspend fun setConfig(config: CameraUseCase.Config) {
+        _config.emit(config)
+        updateUseCaseGroup()
+        rebindUseCases()
     }
 
     override fun tapToFocus(
@@ -213,64 +204,41 @@ class CameraXCameraUseCase @Inject constructor(
         }
     }
 
-    override fun setFlashMode(flashModeStatus: FlashModeStatus) {
-        imageCaptureUseCase.flashMode = when (flashModeStatus) {
-            FlashModeStatus.OFF -> ImageCapture.FLASH_MODE_OFF // 2
-            FlashModeStatus.ON -> ImageCapture.FLASH_MODE_ON // 1
-            FlashModeStatus.AUTO -> ImageCapture.FLASH_MODE_AUTO // 0
-        }
-        Log.d(TAG, "Set flash mode to: ${imageCaptureUseCase.flashMode}")
-    }
-
-    override suspend fun setAspectRatio(aspectRatio: AspectRatio, isFrontFacing: Boolean) {
-        this.aspectRatio = aspectRatio
-        updateUseCaseGroup()
-        rebindUseCases()
-    }
-
-    override suspend fun setSingleStreamCapture(singleStreamCapture: Boolean) {
-        singleStreamCaptureEnabled = singleStreamCapture
-        Log.d(TAG, "Changing CaptureMode: singleStreamCaptureEnabled: $singleStreamCaptureEnabled")
-        updateUseCaseGroup()
-        rebindUseCases()
+    override fun setFlashMode(flashMode: CameraUseCase.FlashMode) {
+        Log.d(TAG, "Set flash mode to: $flashMode")
+        imageCaptureUseCase.flashMode = flashMode.toImageCaptureFlashMode()
     }
 
     private fun updateUseCaseGroup() {
         val useCaseGroupBuilder = UseCaseGroup.Builder()
-            .setViewPort(ViewPort.Builder(aspectRatio.ratio, previewUseCase.targetRotation).build())
+            .setViewPort(ViewPort.Builder(config.value.aspectRatio.rational, previewUseCase.targetRotation).build())
             .addUseCase(previewUseCase)
             .addUseCase(imageCaptureUseCase)
             .addUseCase(videoCaptureUseCase)
 
-        if (singleStreamCaptureEnabled) {
+        if (config.value.captureMode == CameraUseCase.CaptureMode.CAPTURE_MODE_SINGLE_STREAM) {
             useCaseGroupBuilder.addEffect(SingleSurfaceForcingEffect())
         }
 
         useCaseGroup = useCaseGroupBuilder.build()
     }
 
-    // converts LensFacing from datastore to @LensFacing Int value
-    private fun getLensFacing(isFrontFacing: Boolean): Int =
-        when (isFrontFacing) {
-            true -> CameraSelector.LENS_FACING_FRONT
-            false -> CameraSelector.LENS_FACING_BACK
-        }
-
     private suspend fun rebindUseCases() {
-        val cameraSelector = cameraLensToSelector(
-            getLensFacing(isFrontFacing)
-        )
         cameraProvider.unbindAll()
-        cameraProvider.runWith(cameraSelector, useCaseGroup) {
+        cameraProvider.runWith(config.value.lensFacing.toCameraSelector(), useCaseGroup) {
             camera = it
             awaitCancellation()
         }
     }
+}
 
-    private fun cameraLensToSelector(@LensFacing lensFacing: Int): CameraSelector =
-        when (lensFacing) {
-            CameraSelector.LENS_FACING_FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
-            CameraSelector.LENS_FACING_BACK -> CameraSelector.DEFAULT_BACK_CAMERA
-            else -> throw IllegalArgumentException("Invalid lens facing type: $lensFacing")
-        }
+private fun CameraUseCase.LensFacing.toCameraSelector() = when(this) {
+    CameraUseCase.LensFacing.LENS_FACING_FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
+    CameraUseCase.LensFacing.LENS_FACING_BACK -> CameraSelector.DEFAULT_BACK_CAMERA
+}
+
+private fun CameraUseCase.FlashMode.toImageCaptureFlashMode() = when (this) {
+    CameraUseCase.FlashMode.FLASH_MODE_OFF -> ImageCapture.FLASH_MODE_OFF
+    CameraUseCase.FlashMode.FLASH_MODE_ON -> ImageCapture.FLASH_MODE_ON
+    CameraUseCase.FlashMode.FLASH_MODE_AUTO -> ImageCapture.FLASH_MODE_AUTO
 }

@@ -131,14 +131,14 @@ fun QuickSetFlash(onClick: (FlashModeStatus) -> Unit, currentFlashMode: FlashMod
 }
 
 @Composable
-fun QuickFlipCamera(flipCamera: (Boolean) -> Unit, currentFacingFront: Boolean) {
+fun QuickFlipCamera(flipCamera: () -> Unit, currentFacingFront: Boolean) {
     val enum = when (currentFacingFront) {
         true -> CameraLensFace.FRONT
         false -> CameraLensFace.BACK
     }
     QuickSettingUiItem(
         enum = enum,
-        onClick = { flipCamera(!currentFacingFront) }
+        onClick = { flipCamera() }
     )
 }
 

@@ -215,10 +215,11 @@ fun PreviewScreen(
                     label = {
                         Text(
                             stringResource(
-                                if (previewUiState.singleStreamCapture) {
-                                    R.string.capture_mode_single_stream
-                                } else {
-                                    R.string.capture_mode_multi_stream
+                                when(previewUiState.captureMode){
+                                    CaptureMode.CAPTURE_MODE_SINGLE_STREAM ->
+                                        R.string.capture_mode_single_stream
+                                    CaptureMode.CAPTURE_MODE_MULTI_STREAM ->
+                                        R.string.capture_mode_multi_stream
                                 }
                             )
                         )
