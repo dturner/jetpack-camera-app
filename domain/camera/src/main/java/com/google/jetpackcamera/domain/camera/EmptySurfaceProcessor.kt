@@ -39,6 +39,26 @@ private const val GL_THREAD_NAME = "EmptySurfaceProcessor"
 @SuppressLint("RestrictedApi")
 class EmptySurfaceProcessor : SurfaceProcessor {
 
+    companion object {
+        // A fragment shader that applies a yellow hue.
+        private val TONE_MAPPING_SHADER_PROVIDER = object : ShaderProvider {
+            override fun createFragmentShader(sampler: String, fragCoords: String): String {
+                return """
+                    #extension GL_OES_EGL_image_external : require
+                    precision mediump float;
+                    uniform samplerExternalOES $sampler;
+                    varying vec2 $fragCoords;
+                    void main() {
+                      vec4 sampleColor = texture2D($sampler, $fragCoords);
+                      gl_FragColor = vec4(vec3(sampleColor.r+sampleColor.g+sampleColor.b)/3.0, sampleColor.a);
+                     }
+                    """
+            }
+        }
+
+        private const val GL_THREAD_NAME = "ToneMappingSurfaceProcessor"
+    }
+
     private val glThread : HandlerThread = HandlerThread(GL_THREAD_NAME)
     private var glHandler: Handler
     var glExecutor: Executor
@@ -58,7 +78,7 @@ class EmptySurfaceProcessor : SurfaceProcessor {
         glExecutor.execute {
             glRenderer.init(
                 DynamicRange.SDR,
-                ShaderProvider.DEFAULT
+                TONE_MAPPING_SHADER_PROVIDER
             )
         }
     }
