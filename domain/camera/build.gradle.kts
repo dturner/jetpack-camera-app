@@ -77,6 +77,9 @@ dependencies {
     // Tracing
     implementation(libs.androidx.tracing)
 
+    // Graphics libraries
+    implementation(libs.androidx.graphics.core)
+
     // Project dependencies
     implementation(project(":data:settings"))
     implementation(project(":core:common"))
